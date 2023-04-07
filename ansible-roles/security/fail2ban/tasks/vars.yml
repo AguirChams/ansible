@@ -1,0 +1,3 @@
+fail2ban_directory: /home/node3/fail2ban/
+fail2ban_local_src: /home/aguirchams/ansible/ansible-roles/security/fail2ban/templates/fail2ban.local.j2
+jail_local_src: /home/aguirchams/ansible/ansible-roles/security/fail2ban/templates/jail.local.j2

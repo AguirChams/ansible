@@ -1,0 +1,11 @@
+- hosts: all
+  become: true
+  connection: ssh
+
+  roles: 
+    - role: ansible-roles/applications/k8s/roles/common
+      become: yes 
+    - role: ansible-roles/applications/k8s/roles/master
+      become: yes
+    - role: ansible-roles/applications/k8s/roles/workers
+      become: yes  

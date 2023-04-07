@@ -1,0 +1,20 @@
+
+$PreserveFQDN on
+
+$ModLoad imfile
+$InputFileName /var/log/nginx/naxsi.log
+$InputFileTag naxsi.log
+$InputFileStateFile stat-nginx-naxsi
+$InputFileSeverity info
+$InputFileFacility local3
+$InputRunFileMonitor
+local3.* @graylog.xxx.xx:514
+
+$ModLoad imfile
+$InputFileName /var/log/nginx/access.log
+$InputFileTag access.log
+$InputFileStateFile stat-nginx-access
+$InputFileSeverity info
+$InputFileFacility local3
+$InputRunFileMonitor
+local3.* @graylog.xxx.xx:514

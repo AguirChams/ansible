@@ -1,0 +1,8 @@
+---
+- hosts: all
+  become: true
+
+  roles:
+    - role: ansible-roles/applications/database_server/mysql/ansible-role-mysql
+      become: yes
+... 

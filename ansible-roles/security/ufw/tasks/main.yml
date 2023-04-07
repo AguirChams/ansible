@@ -1,0 +1,33 @@
+---
+
+- name: facts | set
+  set_fact:
+    kernel_version: "{{ ansible_kernel | regex_search('^([0-9]+\\.[0-9]+\\.[0-9]+)') }}"
+  tags:
+    - configuration
+    - ufw
+    - ufw-facts
+
+- include: dropped_ssh.yml
+  when:
+    - kernel_version is version('4.14', '>=')
+    - kernel_version is version('5', '<')
+  tags:
+    - configuration
+    - ufw
+    - ufw-fix-dropped-ssh-sessions
+
+- include: ufw-install.yml
+  tags:
+    - configuration
+    - ufw
+    - ufw-install
+
+- include: ufw-config.yml
+  tags:
+    - configuration
+    - ufw
+    - ufw-configure
+ 
+
+...  

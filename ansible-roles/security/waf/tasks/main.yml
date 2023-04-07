@@ -1,0 +1,4 @@
+---
+- include_tasks: prereq.yml
+- include_tasks: nginx-naxsi.yml
+- include_tasks: components.yml

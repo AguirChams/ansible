@@ -1,0 +1,215 @@
+---
+
+- hosts: all
+  become: yes
+  gather_facts: true
+  tasks:
+    - name: Ensure that {{ target_dir }} is empty in the beginning if exists
+      file:
+        path: "{{ target_dir }}"
+        state: absent
+
+    - name: Create folder {{ target_dir }}
+      file:
+        path: "{{ target_dir }}"
+        state: directory
+        mode: 0755
+
+    - name: Remove original nginx package - if exists
+      apt:
+        name: nginx
+        state: absent
+
+    - name: Download from web and unarchive nginx source
+      unarchive:
+        src: "{{ nginx_src }}"
+        dest: "{{ target_dir }}"
+        remote_src: True
+
+    - name: Install unzip for later use
+      apt:
+        name: "{{ item }}"
+        state: installed
+      with_items:
+       - unzip
+    - name: Upload from /files and unarchive naxsi repo
+      unarchive:
+        src: files/naxsi-master.zip
+        dest: "{{ target_dir }}"
+
+    - name: Install some dependencies for build and so on...
+      apt:
+        name: "{{ item }}"
+        state: installed
+      with_items:
+       - gcc
+       - libpcre3-dev
+       - libssl-dev
+       - make
+       - mc
+
+    - name: Upload modified .configure script (configure-naxsi) for building ngnix with naxsi
+      copy:
+        src: files/configure-naxsi
+        dest: "{{ target_dir }}/nginx-{{ nginx_ver }}"
+        owner: ubuntu
+        group: ubuntu
+        mode: 0744
+
+    - name: Running ./configure-naxsi (building nginx with naxsi)
+      command: ./configure-naxsi
+      args:
+        chdir: "{{ target_dir }}/nginx-{{ nginx_ver }}"
+    - name: Running "make" 
+      command: make 
+      args:
+        chdir: "{{ target_dir }}/nginx-{{ nginx_ver }}"
+    - name: Running "make install"
+      command: make install 
+      args:
+        chdir: "{{ target_dir }}/nginx-{{ nginx_ver }}"
+
+### NGINX CONFIGURATION ###
+
+    - name: Copy nginx.conf
+      copy:
+        src: files/etc/nginx/nginx.conf
+        dest: /etc/nginx
+        owner: root
+        group: root
+        mode: 0644
+        backup: yes
+
+    - name: Ensure that sites-available, sites-enabled are empty if exist
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - /etc/nginx/sites-available
+        - /etc/nginx/sites-enabled
+
+    - name: Create dirs - sites-available, sites-enabled directories and additional required dirs
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: 0755
+      with_items:
+        - /etc/nginx/sites-available
+        - /etc/nginx/sites-enabled
+        - /etc/nginx/ssl
+        - /var/lib/nginx
+        - /var/lib/nginx/body
+        - /var/lib/nginx/fastcgi
+        - /var/www/html
+
+    - name: Upload sites-available files onto target
+      template:
+        src: "templates/etc/nginx/sites-available/{{ item }}.j2"
+        dest: "/etc/nginx/sites-available/{{ item }}"
+        owner: root
+        group: root
+        mode: 0644
+        backup: yes
+      with_items:
+        - waf-ip
+        - waf-ssl-ip
+        - waf-default
+        - waf-ssl-default
+
+    - name: Create symlink from sites-available to sites-enabled
+      file: 
+        src: "/etc/nginx/sites-available/{{ item }}" 
+        dest: "/etc/nginx/sites-enabled/{{ item }}"
+        state: link
+#      notify: nginx reload
+      with_items:
+        - waf-ip
+        - waf-ssl-ip
+        - waf-default
+        - waf-ssl-default
+
+    - name: Copy SSL cert for nginx
+      copy:
+        src: files/etc/nginx/ssl/waf-ssl.crt
+        dest: /etc/nginx/ssl/waf-ssl.crt
+        owner: root
+        group: root
+        mode: 0644
+        backup: yes
+   
+    - name: Copy SSL key for nginx
+      copy:
+        src: files/etc/nginx/ssl/waf-ssl.key-vault
+        dest: /etc/nginx/ssl/waf-ssl.key
+        owner: root
+        group: root
+        mode: 0400
+        backup: yes
+   
+    - name: Copy naxsi_core.rules 
+      copy:
+        src: files/etc/nginx/naxsi_core.rules
+        dest: /etc/nginx/naxsi_core.rules
+        owner: root
+        group: root
+        mode: 0644
+        backup: yes
+
+    - name: Copy empty naxsi_whitelist.rules for placing learned rules. Uncomment referring -include- in nginx sites-available file.
+      copy:
+        src: files/etc/nginx/naxsi_whitelist.rules
+        dest: /etc/nginx/naxsi_whitelist.rules
+        owner: root
+        group: root
+        mode: 0644
+        backup: yes
+
+    - name: Install PHP for NGINX
+      apt:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - php7.0
+        - php7.0-fpm
+
+    - name: Update /etc/php/7.0/fpm/pool.d/www.conf to parse also html, jpg, css... by changing security.limit_extensions value. (not needed and kept commented out - 20170209)
+      copy:
+        src: files/etc/php/7.0/fpm/pool.d/www.conf
+        dest: /etc/php/7.0/fpm/pool.d/www.conf
+        owner: root
+        group: root
+        mode: 0644
+        backup: yes
+
+    - name: Restart php7.0-fpm
+      service: 
+        name: php7.0-fpm
+        state: restarted
+
+    - name: Copy files for 50x. Naxsi error page to the target
+      copy:
+        src: "files/var/www/html/{{ item }}"
+        dest: "/var/www/html/{{ item }}"
+        owner: root
+        group: root
+        mode: 0644
+      with_items:
+        - 50x.php
+        - 50x.css
+        - stop.jpg
+
+    - name: Copy 50x.css to the target - custom Naxsi error page 
+      copy:
+        src: files/var/www/html/50x.css
+        dest: /var/www/html/50x.css
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Restart nginx
+      command: "{{ item }}"
+      with_items:
+        - nginx -s stop
+        - nginx
+      ignore_errors: yes
+      tags: reboot

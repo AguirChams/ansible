@@ -1,0 +1,20 @@
+---
+
+
+- name: Include vars
+  include_vars:
+    file: vars.yml
+
+- name: Remove SSH access 
+  become: true
+  lineinfile:
+    dest: "/home/{{ user }}/.ssh/authorized_keys"
+    line: "{{ key }}"
+    state: absent
+
+
+- name: Delete User
+  user:
+    name: "{{ root }}"
+    state: absent
+    remove: yes   

@@ -1,0 +1,8 @@
+- hosts: all
+  become: true
+  connection: ssh
+
+  roles:    
+    - role: ansible-roles/security/ufw
+      become: yes
+

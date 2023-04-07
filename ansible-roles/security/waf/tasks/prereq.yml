@@ -1,0 +1,18 @@
+---
+- name: set proxy and bootstrap Python 2
+  become: yes
+  gather_facts: false
+  roles:
+    - { role: ansible-set-proxy, http_proxy_address: "http://xxx.xx:3128", https_proxy_address: "http://xxx.xx:3128", tags: ["set-proxy"] }
+    - { role: ansible-py2-bootstrap, tags: [ "py2-bootstrap"] }
+- name: set FQDN
+  become: yes
+  gather_facts: false
+  roles:
+    - { role: ansible-fqdn, fqdn: "{{ inv_hostname }}", tags: ['fqdn'] }
+- name: Locale hack - needed for e.g. pip install...
+  become: yes  
+  gather_facts: false 
+  tasks:
+    - name: Locate hack
+      raw: export LC_ALL=C

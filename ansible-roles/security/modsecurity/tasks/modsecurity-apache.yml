@@ -1,0 +1,30 @@
+---
+- name: Install the Apache mod_security2 module
+  apt:
+    name: libapache2-mod-security2
+    update_cache: yes
+    state: present
+
+
+- name: enable mod_security2
+  apache2_module:
+    name: security2
+    state: present
+  notify:
+   - restart apache2
+
+
+- name: Deploy modsecurity.conf file
+  template:
+    src: "modsecurity.conf.j2"
+    dest: "{{ apache_conf_dir }}/modsecurity.conf"
+    owner: root
+    group: root
+    mode: 0644
+
+
+- name: enable mod_securit2 config file
+  command: "a2enconf modsecurity.conf"
+  notify:
+  - restart apache2
+

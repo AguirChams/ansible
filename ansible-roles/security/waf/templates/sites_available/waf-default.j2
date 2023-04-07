@@ -1,0 +1,84 @@
+##
+include /etc/nginx/naxsi_core.rules;
+
+server {
+	listen {{ waf_port_ext_def }};
+	#listen [::]:8888 default_server;
+
+	root /var/www/html;
+
+	# Add index.php to the list if you are using PHP
+	index index.html index.htm index.nginx-debian.html;
+
+	server_name {{ server_def }};
+
+        #Additional naxsi directives
+        set $naxsi_flag_enable 1;
+        #Ak je Learning On, neprebieha presmeorvanie na Error page.
+        set $naxsi_flag_learning 0;
+        set $naxsi_extensive_log 1;
+
+        location / {
+        #Enable naxsi
+        SecRulesEnabled;
+        #Enable learning mode - I am managing it via set $naxsi_flag_learning 1;
+        #LearningMode;
+
+        #Whitelist
+        #include /etc/nginx/naxsi_whitelist.rules;
+
+        #Define where blocked requests go
+        DeniedUrl "/50x.php";
+        #CheckRules, determining when naxsi needs to take action
+        CheckRule "$SQL >= 8" BLOCK;
+        CheckRule "$RFI >= 8" BLOCK;
+        CheckRule "$TRAVERSAL >= 4" BLOCK;
+        CheckRule "$EVADE >= 4" BLOCK;
+        CheckRule "$XSS >= 8" BLOCK;
+        #naxsi logs goes there
+        error_log /var/log/nginx/naxsi.log;
+
+        proxy_pass {{ proxied_target_def }};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+        }
+
+        error_page   405 500 502 503 504 /50x.php;
+        #This is where the blocked requests are going
+        location = /50x.php {
+            try_files $uri =404;
+            include /etc/nginx/fastcgi.conf;
+            fastcgi_pass unix:/run/php/php7.0-fpm.sock;
+            root /var/www/html;
+            internal;
+        }
+
+        location = /50x.css {
+            add_header  Content-Type    text/css;
+        }
+
+        #Tested for 50x error page. Disrupted graylog app.
+        #location ~* \.(jpg|jpeg|png|gif|ico|css|js)$ {
+        #    expires 1;
+        #}
+
+        #location = /50x.html {
+        #return 418; #I'm a teapot \o/
+        #}
+
+        #location ~ \.php$ {
+        #        try_files $uri =404;
+        #        include /etc/nginx/fastcgi.conf;
+        #        fastcgi_pass unix:/run/php/php7.0-fpm.sock;
+        #}
+
+
+	# deny access to .htaccess files, if Apache's document root
+	# concurs with nginx's one
+	#
+	#location ~ /\.ht {
+	#	deny all;
+	#}
+}

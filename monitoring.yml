@@ -1,0 +1,8 @@
+---
+
+- hosts: all
+  become: yes
+  roles:
+    - ansible-roles/configuration/monitoring/node_exporter
+    - ansible-roles/configuration/monitoring/prometheus
+    - ansible-roles/configuration/monitoring/grafana

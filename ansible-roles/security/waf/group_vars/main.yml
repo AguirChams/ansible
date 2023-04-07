@@ -1,0 +1,24 @@
+---
+
+target_dir: /home/ubuntu/nginx-naxsi
+nginx_ver: 1.11.8
+nginx_src: http://nginx.org/download/nginx-{{ nginx_ver }}.tar.gz
+
+
+#server: default_server means listening on WAF IP address
+waf_port_ext_ip: 80
+#server_ip: default_server 
+proxied_target_ip: http://x.x.x.x
+waf_port_ext_ssl_ip: 443
+#server_ssl_ip: default_server
+proxied_target_ssl_ip: https://juraj-test.xxx.xx:443
+
+waf_port_ext_def: 80
+server_def: naxsi-test.xxx.xx
+proxied_target_def: http://juraj-test.xxx.xx
+waf_port_ext_ssl_def: 443
+server_ssl_def: naxsi-test.xxx.xx
+proxied_target_ssl_def: https://juraj-test.xxx.xx:443
+
+es_url: https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/deb/elasticsearch/2.4.2/elasticsearch-2.4.2.deb
+es_pkg: elasticsearch-2.4.2.deb

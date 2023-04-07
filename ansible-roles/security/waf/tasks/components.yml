@@ -1,0 +1,82 @@
+---
+
+- hosts: all
+  become: yes
+  gather_facts: true
+  tasks:
+    - name: Install Java
+      apt: 
+        name: openjdk-8-jdk
+        state: present
+        update_cache: yes 
+        cache_valid_time: 3600
+
+    - name: wget elasticsearch - Naxsi currently stable on ES 2.4.2
+      raw: wget -P /tmp {{ es_url }}
+  
+    - name: Install elasticsearch
+      raw: dpkg -i /tmp/{{ es_pkg }}
+
+    - name: Copy elasticsearch.yml template
+      template:
+        src: templates/etc/elasticsearch/elasticsearch.yml.j2
+        dest: /etc/elasticsearch/elasticsearch.yml
+        owner: root
+        group: root
+        mode: 0644
+        backup: yes
+
+    - name: Restart elasticsearch
+      service: 
+        name: elasticsearch
+        state: restarted
+
+    - name: Updating nxapi.json with {{ ansible_default_ipv4.address }}:9200
+      lineinfile: 
+        dest: /home/ubuntu/nginx-naxsi/naxsi-master/nxapi/nxapi.json
+        state: present 
+        regexp: "9200"
+        line: " \"host\" : \"{{ ansible_default_ipv4.address }}:9200\","
+        owner: root
+        group: root
+        mode: 0644
+        backup: yes
+      tags: nxapi
+
+    - name: Install python-pip 
+      apt:
+        name: python-pip
+        state: present
+        update_cache: yes 
+        cache_valid_time: 3600
+
+
+    - name: Install elasticsearch python library for running nxtool.py
+      pip:
+        name: elasticsearch
+
+
+    - name: Install rsyslog
+      apt: 
+        name: rsyslog
+        state: installed
+        update_cache: yes 
+        cache_valid_time: 3600
+
+    - name: Rename 50-default.conf to ignore it by rsyslog. If already renamed - ignore...
+      command: mv /etc/rsyslog.d/50-default.conf /etc/rsyslog.d/x-50-default.conf
+      ignore_errors: yes
+
+    - name: Set log forwarding to graylog instance
+      template: 
+        src: templates/etc/rsyslog.d/70-graylog.conf.j2
+        dest: /etc/rsyslog.d/70-graylog.conf
+        owner: root
+        group: root
+        mode: 0644
+        backup: yes
+ 
+    - name: Restart rsyslog
+      service: 
+        name: rsyslog
+        state: restarted

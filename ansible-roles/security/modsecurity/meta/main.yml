@@ -1,0 +1,27 @@
+---
+dependencies: []
+
+galaxy_info:
+  role_name: apache_modsecurity
+  description: Install and configure Apache mod_security2 module
+  license: "license (BSD, MIT)"
+  min_ansible_version: 2.2
+  platforms:
+    - name: Ubuntu
+      versions:
+      - all
+    - name: Debian
+      versions:
+      - all
+    - name: FreeBSD
+      versions:
+      - all
+    - name: OpenBSD
+      versions:
+      - all
+    - name: RedHat
+      versions:
+      - all
+  galaxy_tags:
+    - apache
+    - web

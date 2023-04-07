@@ -1,0 +1,46 @@
+---
+
+- name: Include vars
+  include_vars:
+    file: vars.yml
+
+- name: allow user to have passwordless sudo
+  become: true
+  lineinfile:
+    dest: /etc/sudoers
+    state: present
+    regexp: '^%{{ root }}'
+    line: '%{{ root }} ALL=(ALL) NOPASSWD: ALL'  
+    validate: 'visudo -cf %s'
+
+- name: add user to sudoers
+  user:
+    name={{ root }}
+    append=yes
+    state=present
+    createhome=yes
+  become: yes
+#  become_user: root  
+
+
+- name: Add SSH public key to authorized_keys
+  lineinfile:
+    dest: "/home/{{ user }}/.ssh/authorized_keys"
+    line: "{{ key }}"
+    state: present
+  become: yes  
+
+- name: Disallow password authentication
+  lineinfile: dest=/etc/ssh/sshd_config
+              regexp="^PasswordAuthentication"
+              line="PasswordAuthentication no"
+              state=present
+#- name: set up authorized keys for root user 
+#   authorized_key: user={{ user }} key={{ key }} path="/home/{{ user }}/.ssh/authorized_keys"
+  notify:
+    - restart ssh
+
+#- name: SSH to server
+#  shell: ssh "{{ root }}"@"{{ server_ip }}"   
+#  args: 
+#    warn: no

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="$PROJECT_DIR$/ansible-roles/applications/database_server/mysql/ansible-role-mysql" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/ansible-roles/applications/java" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/ansible-roles/applications/jenkins" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/ansible-roles/applications/k8s" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/ansible-roles/applications/php" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/ansible-roles/applications/webserver/apache" vcs="Git" />
+  </component>
+</project>

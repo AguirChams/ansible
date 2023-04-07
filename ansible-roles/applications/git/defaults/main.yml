@@ -1,0 +1,8 @@
+---
+
+# Where to place the copies of the repositories.
+git_repository_destination: /home/{{ git_username | default('unset') }}/Documents/github.com/{{ git_username | default('unset') }}
+
+git_force: no
+
+

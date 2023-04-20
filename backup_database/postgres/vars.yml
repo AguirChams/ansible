@@ -1,4 +1,0 @@
----
-backup_dir : "{{ backup_dir }}" 
-db_name: "{{ db_name }}"
-path: "{{ path }}"

@@ -1,0 +1,20 @@
+backup_user : root
+backup_group  : root 
+backup_src  : /home/node4/test
+backup_frequency_minutes : 3
+backup_dest  : /home/node4/back
+path: /home/aguirchams/test/ 
+# The rsync filter of files/directories to include/exclude
+backup_filter: |
+  !
+  # Include everything
+  + /*
+
+# Directory for backup scripts
+backup_script_dir: '~/.backup'
+
+# The name to use for cron
+backup_cron_name: backup
+
+# The name to use for systemd service
+backup_service_name: backup

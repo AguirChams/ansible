@@ -1,0 +1,7 @@
+---
+
+aws_access_key: "{{ aws_access_key }}"
+aws_secret_key: "{{ aws_secret_key }}"
+s3_bucket_name: "{{ s3_bucket_name }}"
+path: "{{ path }}"    #local where folder exixts
+region: "{{ region }}" 

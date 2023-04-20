@@ -1,0 +1,31 @@
+---
+
+- name: Include vars
+  include_vars:
+    file: vars.yml
+
+- name: Install pip on Ubuntu
+  when: ansible_os_family == 'Debian'
+  apt:
+    name: python3-pip
+    state: present
+- name: Install pip on CentOS
+  when: ansible_os_family == 'RedHat'
+  yum:
+    name: python3-pip
+    state: present
+- name: Install boto3 and botocore Python modules
+  pip:
+    name:
+      - boto3
+      - botocore
+          
+- name: Upload files and folders to S3
+  boto3:
+    aws_access_key_id: "{{ aws_access_key }}"
+    aws_secret_access_key: "{{ aws_secret_key }}"
+    region: "{{ region }}"
+    bucket: "{{ s3_bucket_name }}"
+    src: "{{ path }}"
+    dest: "/"
+    mode: recursive

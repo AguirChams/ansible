@@ -1,7 +1,7 @@
 # ansible
 What is this?
 
-This is an Ansible project I use to configure and maintain my personal workstations, install virtual machines and applications , manage security settings, manage the configuration and more.
+This is an Ansible project I use to configure and maintain my personal workstations, install virtual machines and applications , manage security settings, manage the configuration.
 
 Requirements for using ansible 
 

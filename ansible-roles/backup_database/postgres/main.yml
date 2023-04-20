@@ -1,0 +1,30 @@
+---
+- name: Include vars
+  include_vars:
+    file: vars.yml
+
+- name: utility present
+  ansible.builtin.package:
+    name: python3-psycopg2
+    state: present
+
+- name: Backup directory
+  ansible.builtin.files:
+    path: "{{ backup_dir }}"     
+    mode: 0777
+    owner: postgres
+    state: directory
+
+- name: Backup db
+  community.postgresql.postgresql_db:
+    state: dump
+    name: "{{ db_name }}"
+    Target: "{{ backup_dir }}/{{ db_name }}.sql"
+  become: true
+  become_user: postgres     
+
+- name: Downloading backup file to localhost
+  ansible.builtin.fetch:
+    src: "{{ backup_dir }}/{{ db_name }}.sql"
+    dest: "{{ path }}"
+    flat: yes  

@@ -1,0 +1,8 @@
+---
+
+login_database: "{{ login_database }}"
+login_user: "{{ login_user }}"
+login_password: "{{ login_password }}"
+db_name: "{{ db_name }}"
+backup_dir: "{{ backup_dir }}"
+path: "{{ path }}"

@@ -1,0 +1,39 @@
+---
+
+- name: Include vars
+  include_vars:
+    file: vars.yml
+
+- name: install MySQL client
+  ansible.builtin.package:
+    name: mysql-client
+    state: present
+
+- name: Create Backup directory
+  ansible.builtin.file:
+    path: "{{ backup_dir }}"     
+    mode: 0777
+    owner: mysql
+    state: directory      
+
+- name: Backup MySQL database
+  ansible.builtin.command:
+    cmd: "mysqldump -u {{ db_username }} -p\"{{ db_password }}\" {{ db_name }} --quick --lock-tables=false > {{ backup_dir }}/{{ db_name }}.sql --no-tablespaces"
+  args:
+    creates: "{{ backup_dir }}/{{ db_name }}.sql"
+    
+
+- name: Download backup file to localhost
+  ansible.builtin.fetch:
+    src: "{{ backup_dir }}/{{ db_name }}.sql"
+    dest: "{{ path }}"
+
+
+- name: Grant write permissions to backup directory
+  ansible.builtin.file:
+    path: "{{ path }}"
+    mode: "u+rwx,g+rx,o+rx"
+    state: directory
+
+
+

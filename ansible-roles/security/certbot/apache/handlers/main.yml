@@ -1,0 +1,26 @@
+---
+- name: restart apache
+  service:
+    name: "{{ apache_service }}"
+    state: "{{ apache_restart_state }}"
+
+- name: restorecon on readable dirs
+  command: "restorecon -r {{ item }}"
+  loop: "{{ apache_sefcontext_httpd_sys_content_t }}"
+  become: true
+  when: "apache_selinux | bool"
+
+- name: "Restorecon on httpd writable directories"
+  command: "restorecon -r -R -v {{ item }}"
+  become: true
+  loop: "{{ apache_sefcontext_httpd_sys_rw_content_t }}"
+  when: "apache_selinux | bool"
+
+- name: "apache owner on writable directories"
+  file:
+    recurse: true
+    path: "{{ item }}"
+    owner: "{{ apache_user | default('apache') }}"
+    mode: "u+rw"
+  loop: "{{ apache_sefcontext_httpd_sys_rw_content_t }}"
+  become: true

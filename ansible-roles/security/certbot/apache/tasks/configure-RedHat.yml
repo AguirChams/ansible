@@ -1,0 +1,110 @@
+---
+- name: Configure Apache.
+  lineinfile:
+    dest: "{{ apache_server_root }}/conf/{{ apache_daemon }}.conf"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+  with_items: "{{ apache_ports_configuration_items }}"
+  notify: "restart apache"
+  register: apache_config_result
+
+- name: "delete centos autoindex, welcome, userdir conf"
+  file:
+    path: "/etc/httpd/conf.d/{{ item }}"
+    state: "absent"
+  with_items:
+    - "welcome.conf"
+    - "autoindex.conf"
+    - "userdir.conf"
+  notify: "restart apache"
+
+- name: Check whether certificates defined in vhosts exist.
+  stat: path={{ item.certificate_file }}
+  register: apache_ssl_certificates
+  with_items: "{{ apache_vhosts_ssl }}"
+
+- name: "Register if any hosts has ssl for letsencrypt (ssl_type undefined or 'certbot')"
+  debug:
+    msg: "set variable if some vhost has ssl defined"
+  with_items: "{{ apache_vhosts }}"
+  register: "apache_vhost_has_ssl_certbot"
+  when: "item.ssl | default (false) | bool  and (item.ssl_type is undefined or item.ssl_type =='letsencrypt')"
+
+- name: "Register if any hosts has ssl for digicert / uib"
+  debug:
+    msg: "set variable if some vhost has ssl defined"
+  with_items: "{{ apache_vhosts }}"
+  register: "apache_vhost_has_ssl_digicert"
+  when: "item.ssl | default (false) | bool and  item.ssl_type is defined and item.ssl_type =='uib'"
+
+- name: "debug apache_vhost_has_ssl.digicert"
+  debug:
+    msg: "{{ apache_vhost_has_ssl_digicert }}"
+- name: "include digicert-uib"
+  include_tasks: "uib_ssl.yml"
+  # don't include if debug task was skipped (no items with uib type) 
+  when: "not apache_vhost_has_ssl_digicert.results[0].skipped | default(false) | bool"
+#check if some vhost has certbot set for ssl
+
+- name: Include local tasks for ssl template and certbot
+  include_tasks: "certbot_ssl.yml"
+  when: "not apache_vhost_has_ssl_certbot.results[0].skipped | default(false) | bool"
+
+# check if some vhost as uib set for ssl
+- name: Add apache vhosts configuration.
+  template:
+    src: "{{ apache_vhosts_template }}"
+    dest: "{{ apache_conf_path }}/{{ item.servername }}.conf"
+    owner: root
+    group: root
+    backup: true
+    mode: 0644
+  notify: restart apache
+  when: apache_create_vhosts
+  vars:
+    current_vhost: "{{ item.servername }}"
+  with_items: "{{ apache_vhosts }}"
+
+- name: "validate status with apachectl" # noqa 503
+  command: apachectl -t
+  register: apache_result
+  ignore_errors: yes
+  tags: httpd
+  become: true
+  when: apache_config_result.changed
+
+- name: "Ending play if configtest fails"
+  fail:
+     msg: "Apache configuration is invalid. Please check before re-running the playbook."
+  when: apache_result is failed
+  tags: httpd
+  become: true
+
+- name: "deleting backup config files"
+  command: 'find -ipath "*conf.[0-9][0-9][0-9][0-9]*.[0-9]*" -delete'
+  args:
+    chdir: "{{ apache_conf_path }}/"
+  become: true
+  when: apache_result is success
+
+- name: "adding httpd_sys_content_t recursively"
+  sefcontext:
+    target: "{{ item }}(/.*)?"
+    setype: "httpd_sys_content_t"
+    state: "present"
+  become: true
+  loop: "{{ apache_sefcontext_httpd_sys_content_t }}"
+  notify: "restorecon on readable dirs"
+  when: "apache_selinux | bool"
+
+- name: "make sure readable directories exists"
+  file:
+    path: "{{ item }}"
+    state: "directory"
+  become: true
+  loop: "{{ apache_sefcontext_httpd_sys_content_t }}"
+
+- name: "include tasks writable httpd"
+  include_tasks: "writable-RedHat.yml"
+  when: "apache_sefcontext_httpd_sys_rw_content_t | length > 0"

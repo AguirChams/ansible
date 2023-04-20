@@ -1,0 +1,19 @@
+- name: "Set httpd paths {{ apache_sefcontext_httpd_sys_rw_content_t }} to writable"
+  sefcontext:
+    target: "{{ item }}(/.*)?"
+    setype: "httpd_sys_rw_content_t"
+    state: "present"
+  become: true
+  loop: "{{ apache_sefcontext_httpd_sys_rw_content_t }}"
+  when: "apache_selinux | bool"
+  notify:
+  - "Restorecon on httpd writable directories"
+  - "apache owner on writable directories"
+
+- name: "make sure writable directories exists"
+  file:
+    path: "{{ item }}"
+    state: "directory"
+  become: true
+  loop: "{{ apache_sefcontext_httpd_sys_rw_content_t }}"
+

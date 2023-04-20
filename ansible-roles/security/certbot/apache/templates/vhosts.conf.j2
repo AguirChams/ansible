@@ -1,0 +1,53 @@
+# Ansible managed
+{{ apache_global_vhost_settings }}
+
+{# Set up VirtualHosts #}
+{% for vhost in apache_vhosts if vhost.servername == current_vhost %}
+<VirtualHost {{ apache_listen_ip }}:{{ apache_listen_port }}>
+  ServerName {{ vhost.servername }}
+
+{% if vhost.serveralias is defined %}
+  ServerAlias {{ vhost.serveralias }}
+{% endif %}
+{% if vhost.documentroot is defined %}
+  DocumentRoot "{{ vhost.documentroot }}"
+{% endif %}
+
+{% if vhost.serveradmin is defined %}
+  ServerAdmin {{ vhost.serveradmin }}
+{% endif %} 
+{%if (vhost.ssl is undefined or not vhost.ssl | bool) or (vhost.force_ssl is defined and vhost.force_ssl == false) %}
+{% if vhost.documentroot is defined %}
+  <Directory "{{ vhost.documentroot }}">
+    AllowOverride {{ vhost.allow_override | default(apache_allow_override) }}
+    Options {{ vhost.options | default(apache_options) }}
+{% if apache_vhosts_version == "2.2" %}
+    Order allow,deny
+    Allow from all
+{% else %}
+    Require all granted
+{% endif %}
+  </Directory>
+
+{% endif %}
+
+{% if apache_deny_git == true %}
+<LocationMatch ".git/">
+Require all denied
+</LocationMatch>
+{% endif %}
+
+{% if vhost.extra_parameters is defined %}
+  {{ vhost.extra_parameters }}
+{% endif %}
+{%endif %}
+
+{% if vhost.ssl is defined and vhost.ssl == true and vhost.force_ssl | default(true) | bool %}
+{{ vhost.http_only_extra_parameters | default('') }}
+Redirect Permanent / https://{{ vhost.servername }}/
+
+{% endif %}
+
+</VirtualHost>
+
+{% endfor %}

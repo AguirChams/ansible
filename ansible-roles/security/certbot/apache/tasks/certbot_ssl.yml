@@ -1,0 +1,101 @@
+- name: "Register if any hosts has ssl"
+  debug:
+    msg: "set variable if some vhost has ssl defined"
+  with_items: "{{ apache_vhosts }}"
+  register: "apache_vhost_has_ssl"
+  when: "item.ssl is defined and item.ssl"
+
+- name: "block if ssl is set"
+  block:
+  - name: "check if certificate exists for server"
+    stat:
+      path: "/etc/letsencrypt/live/{{ apache_vhosts[0].servername }}/cert.pem"
+    register: "letsencrypt_cert"
+  - name: "register a list of aliases to add to SSL"
+    set_fact:
+      ssl_alias: "{{ [ apache_vhosts[0].serveralias | default('deleteme'),  apache_vhosts[0].certalias | default('deleteme') ] | reject('equalto','deleteme') | list }}"
+  - name: "debug"
+    debug:
+      msg: "{{ ssl_alias }}"
+  - name: "copy config used by certbot to server"
+    template:
+      backup: true
+      src: "temp.conf.j2"
+      dest: "/etc/httpd/conf.d/temp.conf"
+    when: "not letsencrypt_cert.stat.exists or apache_vhosts[0].ssl_force | default(false) | bool"
+    vars:
+      test_servername: "{{ apache_vhosts[0].servername }}"
+      test_alias: "{{ ssl_alias }}"
+    become: true
+
+  - name: "install {{ certbot_packages }}"
+    yum:
+      name: "{{ certbot_packages }}"
+      state: present
+    become: true
+
+  - name: "start httpd"
+    systemd:
+      name: "httpd"
+      state: "restarted"
+    become: true
+    when: "apache_vhosts[0].ssl_force | default(false) | bool"
+   
+  - name: "run command to get certificate"
+    command: "certbot --apache certonly {{ certbot_ssl_dry_run }} --non-interactive --agree-tos --email {{ item.serveradmin }} -d {{ item.servername }}{%if item.serveralias is defined or item.certalias is defined %},{{ ssl_alias |  join(',') }} {% if item.ssl_force | default(false) | bool %}--expand{%endif %} {% else %}{% endif %}" # noqa 204
+    with_items: "{{ apache_vhosts }}"
+    become: true
+    when: "(apache_certbot and not letsencrypt_cert.stat.exists and item.ssl is defined and item.ssl | bool) or (item.ssl_force | default(false) | bool and (item.ssl_type is undefined or item.ssl_type == 'letsencrypt'))"
+    notify: restart apache
+
+  - name: "delete temp file from server"
+    file:
+      path: "/etc/httpd/conf.d/temp.conf"
+      state: absent
+    become: true
+
+  - name: "Add apache vhosts ssl template"
+    template:
+      src: "{{ apache_vhosts_template_ssl }}"
+      dest: "{{ apache_conf_path }}/00_{{ item.servername }}_ssl.conf"
+      owner: root
+      group: root
+      mode: 0644
+      backup: true
+      #    validate: "apachectl configtest"
+    notify: restart apache
+    when: apache_create_vhosts and item.ssl is defined and item.ssl
+    with_items: "{{ apache_vhosts }}"
+    vars:
+      current_vhost: "{{ item.servername }}"
+    become: true
+
+  - name: "add sefcontext httpd-config to options-ssl-apache.conf"
+    sefcontext:
+      target: "/etc/letsencrypt/options-ssl-apache.conf"
+      setype: "httpd_config_t"
+    become: true
+    when: "apache_selinux | bool"
+
+  - name: "Restorecon on options"
+    command: "restorecon -r -R -v /etc/letsencrypt/options-ssl-apache.conf"
+    become: true
+    when: "apache_selinux | bool"
+
+  - name: "Add commands to sudoers file"
+    lineinfile:
+      path: /etc/sudoers
+      line: "{{ item }}"
+      validate: '/usr/sbin/visudo -cf %s'
+    with_items:
+      - "{{ worker_name }} ALL=(ALL) NOPASSWD: /usr/bin/certbot renew --post-hook /usr/bin/systemctl reload httpd"
+
+  - name: "add cron job"
+    cron:
+      name: "renew letsencrypt (/var/log/letsencrypt/letsencrypt.log)"
+      minute: "0"
+      hour: "5"
+      job: "chronic sh -c \"python -c 'import random; import time; time.sleep(random.random() * 3600)' && sudo /usr/bin/certbot renew --post-hook '/usr/bin/systemctl reload httpd'\"" # noqa 204
+      user: "{{ worker_name }}"
+    become: true
+  when: "apache_certbot"

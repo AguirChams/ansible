@@ -1,0 +1,20 @@
+---
+apache_service: httpd
+apache_daemon: httpd
+apache_daemon_path: /usr/sbin/
+apache_server_root: /etc/httpd
+apache_conf_path: /etc/httpd/conf.d
+
+apache_vhosts_version: "2.4"
+
+__apache_packages:
+  - httpd
+
+apache_ports_configuration_items:
+  - regexp: "^Listen "
+    line: "Listen {{ apache_listen_port }}"
+  - regexp: "^#?NameVirtualHost "
+    line: "NameVirtualHost {{ apache_listen_ip }}:{{ apache_listen_port }}"
+
+
+certbot_packages: '{% if ansible_distribution_major_version == "7" %}["python2-certbot-apache", "certbot","moreutils"]{% elif ansible_distribution_major_version == "8" %}["moreutils","certbot", "python3-certbot-apache" ,"mod_ssl"]{% else %}{% endif %}'

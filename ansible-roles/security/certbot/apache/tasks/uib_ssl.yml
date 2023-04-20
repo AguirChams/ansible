@@ -1,0 +1,156 @@
+# single domain
+- name: "set fact for folder for digicert"
+  set_fact:
+    apache_digicert_uib_home: "/etc/digicert-uib"
+    apache_digicert_uib_archive: "/etc/digicert-uib/archive"
+    apache_digicert_uib_csr: "/etc/digicert-uib/csr"
+    apache_cert_vhost: "{{ apache_vhosts[0] }}"
+
+- name: "register a list of aliases to add to SSL (All aliases must be set in certalias or serveralias. certalias is not added to httpd, but just to config.)"
+  set_fact:
+    ssl_alias: "{{ [ apache_vhosts[0].serveralias | default('deleteme'),  apache_vhosts[0].certalias | default('deleteme') ] | reject('equalto','deleteme') | list }}"
+
+- name: "install package for mod_ssl"
+  package:
+    name: "mod_ssl"
+
+- name: "create parent digicert uib folder"
+  file:
+    path: "{{ apache_digicert_uib_home }}"
+    owner: "root"
+    group: "root"
+    mode: "0555"
+    state: "directory"
+  become: true
+
+- name: "create digicert-uib-sub-folder"
+  file:
+    path: "{{ item }}"
+    state: "directory"
+    owner: root
+    group: "root"
+    mode: "0550"
+  loop:
+  - "{{ apache_digicert_uib_archive }}"
+  - "{{ apache_digicert_uib_csr }}"
+
+- name: "create directory for vhosts"
+  file:
+    path: "{{ apache_digicert_uib_archive }}/{{ apache_cert_vhost.servername }}"
+    state: "directory"
+    owner: "root"
+    group: "root"
+    mode: "0550"
+    setype: "cert_t"
+  when: "apache_cert_vhost.ssl_type == 'uib'"
+
+- name: "stat archive"
+  stat:
+    path: "{{ apache_digicert_uib_archive }}"
+  register: apace_digicert_archive
+
+- name: "prompt for renew"
+  pause:
+    prompt: "Confirm that you want to renew your digicert certificate (y/n)"
+  register: "apache_digicert_confirm_renew"
+  when: "apache_digicert_renew | default(false) | bool"
+
+- name: "generate ssl private key"
+  openssl_privatekey:
+    path: "{{ apache_digicert_uib_archive }}/{{ apache_cert_vhost.servername }}/priv_key.pem"
+    backup: "yes"
+    size: "2048"
+    setype: "cert_t"
+  when: "apache_cert_vhost.ssl_type  | default('letsencrypt')== 'uib'"
+
+- name: "generate an OpenSSL Certificate Signin request"
+  openssl_csr:
+    backup: "yes"
+    path: "{{ apache_digicert_uib_csr }}/{{ apache_cert_vhost.servername }}.csr"
+    privatekey_path: "{{ apache_digicert_uib_home }}/archive/{{ apache_cert_vhost.servername }}/priv_key.pem"
+    country_name: "NO"
+    organization_name: "Universitetet_i_Bergen"
+    common_name: "{{ apache_cert_vhost.servername }}"
+    subject_alt_name: "{{ apache_cert_vhost.altname | default(omit) }}"
+  when: "apache_cert_vhost.ssl_type  | default('letsencrypt')== 'uib'"
+  register: "apache_csr_result"
+
+- name: "send csr file by mail"
+  mail:
+    sender: "ansible@{{ apache_cert_vhost.servername }}"
+    subject: "csr certificate request for {{ apache_cert_vhost.servername }}"
+    to: "{{ apache_cert_vhost.serveradmin }}"
+    host: "{{ apache_mail_host | default(omit) }}"
+    attach:
+      - "{{ apache_digicert_uib_csr }}/{{ apache_cert_vhost.servername }}.csr"
+    body: |
+      Ønsker å bestille SSL sertifikat.
+
+      common_name "{{ apache_cert_vhost.servername }}"
+      altname: "{{ apache_cert_vhost.altname | default ('ingen') }}"
+      wildcard: "{{ apache_cert_vhost.wildcard | default ('nei') }}"
+
+      Kan du også oppdatere sertifikatdatasen (CMDB) for {{ apache_cert_vhost.serveradmin }}?
+
+      Takk!
+  when: "apache_cert_vhost.ssl_type  | default('letsencrypt')== 'uib' and apache_csr_result.changed | bool"
+  become: true
+
+- name: "create symlinks for private keys"
+  file:
+    state: "link"
+    src: "{{ apache_digicert_uib_archive }}/{{ apache_cert_vhost.servername }}/priv_key.pem"
+    dest: "/etc/pki/tls/private/{{ apache_cert_vhost.servername }}.pem"
+  when: "apache_cert_vhost.ssl_type  | default('letsencrypt')== 'uib'"
+
+- name: "set fact for uib renewal"
+  set_fact:
+    uib_renew_ssl: "{{  apache_digicert_renew | default(false) }}"
+- name: "Get certificate with certificate only"
+  get_url:
+    url: "{{ apache_cert_vhost.certificate_only_url }}"
+    force: "{{ uib_renew_ssl }}"
+    setype: "cert_t"
+    dest: "{{ apache_digicert_uib_archive }}//{{ apache_cert_vhost.servername }}/cert.cer"
+    backup: "{{ uib_renew_ssl }}"
+    mode: "0444"
+  when: "apache_cert_vhost.ssl_type  | default('letsencrypt')== 'uib' and apache_cert_vhost.certificate_only_url is defined"
+
+- name: "Get intermediate certs only"
+  get_url:
+    force: "{{ uib_renew_ssl }}"
+    url: "{{ apache_cert_vhost.certificate_interm_only_url }}"
+    setype: "cert_t"
+    dest: "{{ apache_digicert_uib_archive }}//{{ apache_cert_vhost.servername }}/cert_interm.cer"
+    backup: "{{ uib_renew_ssl }}"
+    mode: "0444"
+  when: "apache_cert_vhost.ssl_type  | default('letsencrypt')== 'uib' and  apache_cert_vhost.certificate_interm_only_url is defined"
+
+- name: "Create symlinks for certificates to /etc/pki/"
+  file:
+    state: "link"
+    src: "{{ apache_digicert_uib_archive }}/{{ apache_cert_vhost.servername }}/cert.cer"
+    dest: "/etc/pki/tls/certs/{{ apache_cert_vhost.servername }}.pem"
+  when: "apache_cert_vhost.ssl_type  | default('letsencrypt')== 'uib' and apache_cert_vhost.certificate_only_url is defined"
+
+- name: "Create symlinks for chains to /etc/pki/"
+  file:
+    state: "link"
+    src: "{{ apache_digicert_uib_archive }}/{{ apache_cert_vhost.servername }}/cert_interm.cer"
+    dest: "/etc/pki/tls/certs/{{ apache_cert_vhost.servername }}.chain.pem"
+  when: "apache_cert_vhost.ssl_type  | default('letsencrypt')== 'uib' and apache_cert_vhost.certificate_interm_only_url is defined"
+
+- name: "Add apache vhosts ssl template"
+  template:
+    src: "{{ apache_vhosts_template_ssl }}"
+    dest: "{{ apache_conf_path }}/00_{{ item.servername }}_ssl.conf"
+    owner: root
+    group: root
+    mode: 0644
+    backup: true
+  notify: restart apache
+  when: "item.ssl_type  | default('letsencrypt')== 'uib'"
+  loop: "{{ apache_vhosts }}"
+  vars:
+    current_vhost: "{{ item.servername }}"
+  become: true

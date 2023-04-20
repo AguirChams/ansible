@@ -1,0 +1,7 @@
+<VirtualHost *:80>
+ServerName {{ test_servername }}
+{% for alias in test_alias %}
+ServerAlias {{ alias }}
+{% endfor %}
+</VirtualHost>
+

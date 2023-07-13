@@ -41,11 +41,6 @@ First of all in this project i've used roles , every role is targeting a folder 
 Note: to make those roles executable in any desktop and with your own infos , i've created in each folder a bash script by executing it , it will replace those values (the values you want to enter) in vars.yml playbook and then they will be replaced in your main.yml playbook .
 
 
-Requirements !! :
-
--     If you want to run S3 role you have to make sure that boto3 is installed in your target systems.
-
--     If you want to create Vm , make sure that you have Python library (PyVmomi) installed in your target systems.
 
 
 
